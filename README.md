@@ -95,6 +95,43 @@ cd health_assistant
 2. 填写服务器地址、用户名、密码
 3. 点击「立即同步」
 
+#### 远程目录结构
+
+每条记录独立存储为 JSON 文件，便于跨版本兼容和增量同步：
+
+```
+{webdavUrl}/
+└── health-data/
+    ├── glucose/             ← 血糖记录
+    │   ├── {id}.json
+    │   └── ...
+    ├── weight/              ← 体重记录
+    │   ├── {id}.json
+    │   └── ...
+    ├── bp/                  ← 血压记录
+    │   ├── {id}.json
+    │   └── ...
+    └── analysis/            ← AI 分析结果（仅最新一条）
+        ├── glucose.json
+        ├── weight.json
+        └── bloodPressure.json
+
+{webdavUrl}/health-data.idx  ← 索引文件（仅存 ID + updatedAt）
+```
+
+每条记录 JSON 格式（以血糖为例）：
+```json
+{
+  "id": "1782201106876",
+  "value": 6.2,
+  "measuredAt": "2026-06-23T08:30:00+08:00",
+  "mealType": "空腹",
+  "notes": "",
+  "updatedAt": "2026-06-23T08:30:00Z",
+  "deleted": false
+}
+```
+
 ## License
 
 MIT License
