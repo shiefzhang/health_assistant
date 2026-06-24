@@ -70,7 +70,7 @@ app/src/main/java/com/healthassistant/
 
 ## 截图
 
-<img src="screenshots/dashboard.jpg" width="240" alt="仪表盘"/> <img src="screenshots/glucose.jpg" width="240" alt="血糖数据"/> <img src="screenshots/bp.jpg" width="240" alt="血压数据"/>
+<img src="dashboard.jpg" width="240" alt="仪表盘"/> <img src="glucose.jpg" width="240" alt="血糖数据"/> <img src="bloodpressure.jpg" width="240" alt="血压数据"/>
 
 ## 构建
 
