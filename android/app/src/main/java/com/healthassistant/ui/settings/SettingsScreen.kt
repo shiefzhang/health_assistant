@@ -47,6 +47,13 @@ fun SettingsScreen(
         viewModel.init(context)
     }
 
+    // 当导入/导出状态变化时弹出 Snackbar
+    LaunchedEffect(state.importExportStatus) {
+        if (state.importExportStatus.isNotBlank()) {
+            snackbarHostState.showSnackbar(state.importExportStatus, duration = SnackbarDuration.Short)
+        }
+    }
+
     // 导入文件选择器
 
     // 导入文件选择器
@@ -66,9 +73,14 @@ fun SettingsScreen(
     ) { uri ->
         uri?.let {
             scope.launch {
-                val data = viewModel.getExportData()
-                context.contentResolver.openOutputStream(it)?.use { os ->
-                    os.write(data.toByteArray())
+                try {
+                    val data = viewModel.getExportData()
+                    context.contentResolver.openOutputStream(it)?.use { os ->
+                        os.write(data.toByteArray())
+                    }
+                    viewModel.setExportSuccess()
+                } catch (e: Exception) {
+                    viewModel.setExportError(e.message ?: "导出失败")
                 }
             }
         }
@@ -281,12 +293,12 @@ fun SettingsScreen(
                     }
                 }
 
-                state.importExportStatus.let { status ->
+                state.syncStatus.let { status ->
                     if (status.isNotBlank()) {
                         Text(
                             status,
                             style = MaterialTheme.typography.bodySmall,
-                            color = if (status.startsWith("导入完成") || status.startsWith("导出完成"))
+                            color = if (status.startsWith("同步完成"))
                                 MaterialTheme.colorScheme.primary
                             else
                                 MaterialTheme.colorScheme.error,

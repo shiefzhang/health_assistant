@@ -64,4 +64,11 @@ interface BpDao {
         WHERE deleted = 0 AND measuredAt >= :since
     """)
     suspend fun minSystolicSince(since: String): Int?
+
+    @Query("""
+        SELECT * FROM bp_records 
+        WHERE deleted = 0 AND measuredAt >= :start AND measuredAt < :end
+        ORDER BY measuredAt ASC
+    """)
+    suspend fun getActiveBetween(start: String, end: String): List<BloodPressureRecord>
 }

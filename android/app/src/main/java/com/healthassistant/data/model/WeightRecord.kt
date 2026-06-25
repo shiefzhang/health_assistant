@@ -35,10 +35,19 @@ data class WeightRecord(
         .put("deleted", deleted)
 
     companion object {
+        private val ISO_WITH_TZ = Regex("""\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}([+-]\d{2}:\d{2}|Z)""")
+        private val ISO_WITHOUT_TZ = Regex("""\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}""")
+
+        private fun ensureTimeZone(iso: String): String = when {
+            iso.matches(ISO_WITH_TZ) -> iso
+            iso.matches(ISO_WITHOUT_TZ) -> "$iso+08:00"
+            else -> "$iso${"T00:00:00+08:00"}"
+        }
+
         fun fromJson(obj: JSONObject): WeightRecord {
-            val measured = obj.optString("measuredAt").ifBlank {
+            val measured = ensureTimeZone(obj.optString("measuredAt").ifBlank {
                 "${obj.optString("date")}T${obj.optString("time", "00:00")}:00+08:00"
-            }
+            })
             return WeightRecord(
                 id = obj.optString("id", System.currentTimeMillis().toString()),
                 value = obj.getDouble("value"),

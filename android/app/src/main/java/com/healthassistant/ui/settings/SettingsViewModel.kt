@@ -115,26 +115,36 @@ class SettingsViewModel(
         }
     }
 
-    /** 导入数据 */
+    /** 导入数据（按 type 字段路由到对应数据表） */
     fun importData(text: String) {
         viewModelScope.launch {
             try {
-                var total = 0
+                var totalImported = 0
+                var totalSkipped = 0
                 withContext(Dispatchers.IO) {
-                    val glucose = ExportImportUtil.importGlucoseFromJson(text)
+                    val (glucose, weight, bp) = ExportImportUtil.importByType(text)
                     if (glucose.isNotEmpty()) {
-                        total += repository.importAllGlucose(glucose)
+                        val result = repository.importGlucoseDedup(glucose)
+                        totalImported += result.imported
+                        totalSkipped += result.skipped
                     }
-                    val weight = ExportImportUtil.importWeightFromJson(text)
                     if (weight.isNotEmpty()) {
-                        total += repository.importAllWeight(weight)
+                        val result = repository.importWeightDedup(weight)
+                        totalImported += result.imported
+                        totalSkipped += result.skipped
                     }
-                    val bp = ExportImportUtil.importBpFromJson(text)
                     if (bp.isNotEmpty()) {
-                        total += repository.importAllBp(bp)
+                        val result = repository.importBpDedup(bp)
+                        totalImported += result.imported
+                        totalSkipped += result.skipped
                     }
                 }
-                _state.update { it.copy(importExportStatus = "导入完成：$total 条记录") }
+                val msg = if (totalSkipped > 0) {
+                    "导入完成：新增 $totalImported 条，跳过 $totalSkipped 条重复数据"
+                } else {
+                    "导入完成：新增 $totalImported 条"
+                }
+                _state.update { it.copy(importExportStatus = msg) }
             } catch (e: Exception) {
                 _state.update { it.copy(importExportStatus = "导入失败：${e.message}") }
             }
@@ -146,6 +156,14 @@ class SettingsViewModel(
         val weight = repository.getAllWeightList()
         val bp = repository.getAllBpList()
         return ExportImportUtil.exportToJson(glucose, weight, bp)
+    }
+
+    fun setExportSuccess() {
+        _state.update { it.copy(importExportStatus = "导出完成") }
+    }
+
+    fun setExportError(msg: String) {
+        _state.update { it.copy(importExportStatus = "导出失败：$msg") }
     }
 
     class Factory(private val repository: HealthRepository) : ViewModelProvider.Factory {

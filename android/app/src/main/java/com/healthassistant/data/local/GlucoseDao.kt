@@ -79,4 +79,11 @@ interface GlucoseDao {
         WHERE deleted = 0 AND measuredAt >= :since
     """)
     suspend fun totalCountSince(since: String): Int
+
+    @Query("""
+        SELECT * FROM glucose_records 
+        WHERE deleted = 0 AND measuredAt >= :start AND measuredAt < :end
+        ORDER BY measuredAt ASC
+    """)
+    suspend fun getActiveBetween(start: String, end: String): List<GlucoseRecord>
 }

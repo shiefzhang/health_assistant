@@ -5,12 +5,13 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.healthassistant.data.model.WeightRecord
 import com.healthassistant.data.repository.HealthRepository
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import okhttp3.MediaType.Companion.toMediaType
+import kotlinx.coroutines.withContext
 
 data class WeightScreenState(
-    val period: TimePeriod = TimePeriod.WEEK,
+    val period: ReportPeriod = ReportPeriod.forType(ReportType.WEEK),
     val records: List<WeightRecord> = emptyList(),
     val avg: Double = 0.0,
     val max: Double = 0.0,
@@ -30,39 +31,51 @@ class WeightViewModel(
     val state: StateFlow<WeightScreenState> = _state.asStateFlow()
 
     init {
-        loadPeriod(TimePeriod.WEEK)
+        load()
     }
 
-    fun loadPeriod(period: TimePeriod) {
-        _state.update { it.copy(period = period, isLoading = true) }
+    fun switchType(type: ReportType) {
+        _state.update { it.copy(period = ReportPeriod.forType(type), isLoading = true) }
+        load()
+    }
+
+    fun previousPeriod() {
+        _state.update { it.copy(period = it.period.previous(), isLoading = true) }
+        load()
+    }
+
+    fun nextPeriod() {
+        _state.update { it.copy(period = it.period.next(), isLoading = true) }
+        load()
+    }
+
+    private fun load() {
         viewModelScope.launch {
-            repository.getWeightRecentFlow(period.days).collect { records ->
-                val stats = repository.getWeightStats(period.days)
+            try {
+                val p = _state.value.period
+                val records = withContext(Dispatchers.IO) {
+                    repository.getWeightBetween(p.startIso, p.endIso)
+                }
+                val values = records.map { it.value }
                 _state.update {
                     it.copy(
                         records = records,
-                        avg = stats.average,
-                        max = stats.max,
-                        min = stats.min,
-                        totalCount = stats.totalCount,
+                        avg = if (values.isNotEmpty()) values.average() else 0.0,
+                        max = if (values.isNotEmpty()) values.max() else 0.0,
+                        min = if (values.isNotEmpty()) values.min() else 0.0,
+                        totalCount = records.size,
                         isLoading = false,
                     )
                 }
+            } catch (e: Exception) {
+                _state.update { it.copy(isLoading = false) }
             }
         }
     }
 
-    fun setAiResult(result: String) {
-        _state.update { it.copy(aiAnalysis = result, isAiLoading = false, aiError = null) }
-    }
-
-    fun setAiError(error: String) {
-        _state.update { it.copy(aiError = error, isAiLoading = false) }
-    }
-
-    fun setAiLoading() {
-        _state.update { it.copy(isAiLoading = true, aiAnalysis = null, aiError = null) }
-    }
+    fun setAiResult(result: String) { _state.update { it.copy(aiAnalysis = result, isAiLoading = false, aiError = null) } }
+    fun setAiError(error: String) { _state.update { it.copy(aiError = error, isAiLoading = false) } }
+    fun setAiLoading() { _state.update { it.copy(isAiLoading = true, aiAnalysis = null, aiError = null) } }
 
     suspend fun analyzeWithAi(
         records: List<WeightRecord>,
@@ -70,10 +83,9 @@ class WeightViewModel(
         apiKey: String,
         model: String,
     ): String {
-        require(apiKey.isNotBlank()) { "请先在设置中配置 AI API Key" }
+        require(apiKey.isNotBlank()) { "请先配置 AI API Key" }
         val data = org.json.JSONArray()
         records.sortedByDescending { it.measuredAt }.take(90).forEach { data.put(it.toJson()) }
-
         val prompt = """
 你是一位健康管理助手。请对以下体重数据进行分析，内容包括：
 1. 总体趋势分析
@@ -90,37 +102,7 @@ class WeightViewModel(
 
 数据：${data.toString(2)}
         """.trimIndent()
-
-        val body = org.json.JSONObject()
-            .put("model", model)
-            .put("temperature", 0.2)
-            .put("messages", org.json.JSONArray().apply {
-                put(org.json.JSONObject().apply { put("role", "user"); put("content", prompt) })
-            })
-            .toString()
-
-        val requestBody = "application/json; charset=utf-8".toMediaType().let {
-            okhttp3.RequestBody.create(it, body)
-        }
-        val request = okhttp3.Request.Builder()
-            .url("${apiBaseUrl.trimEnd('/')}/chat/completions")
-            .post(requestBody)
-            .header("Authorization", "Bearer $apiKey")
-            .build()
-
-        val client = okhttp3.OkHttpClient.Builder()
-            .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
-            .readTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
-            .writeTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
-            .build()
-
-        val response = client.newCall(request).execute()
-        require(response.code in 200..299) { "AI 请求失败：HTTP ${response.code}" }
-        val json = org.json.JSONObject(response.body?.string() ?: throw RuntimeException("响应为空"))
-        return json.getJSONArray("choices")
-            .getJSONObject(0)
-            .getJSONObject("message")
-            .getString("content")
+        return com.healthassistant.data.sync.callAiApi(apiBaseUrl, apiKey, model, prompt)
     }
 
     class Factory(private val repository: HealthRepository) : ViewModelProvider.Factory {

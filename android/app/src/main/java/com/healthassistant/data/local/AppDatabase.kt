@@ -12,7 +12,7 @@ import com.healthassistant.data.model.WeightRecord
 
 @Database(
     entities = [GlucoseRecord::class, WeightRecord::class, BloodPressureRecord::class],
-    version = 3,
+    version = 4,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -58,6 +58,11 @@ abstract class AppDatabase : RoomDatabase() {
             db.execSQL("ALTER TABLE `weight_records` ADD COLUMN `bodyFatPercent` REAL")
         }
 
+        // ── v3 → v4：血糖表增加 type 字段 ──
+        private val MIGRATION_3_4 = Migration(3, 4) { db ->
+            db.execSQL("ALTER TABLE `glucose_records` ADD COLUMN `type` TEXT NOT NULL DEFAULT 'blood_glucose'")
+        }
+
         fun getInstance(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 INSTANCE ?: Room.databaseBuilder(
@@ -65,7 +70,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "health_assistant.db"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                     .build()
                     .also { INSTANCE = it }
             }

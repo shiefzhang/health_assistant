@@ -4,6 +4,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.NavigateBefore
+import androidx.compose.material.icons.automirrored.filled.NavigateNext
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Delete
@@ -144,12 +146,34 @@ fun BpDataPage(
         // 周期切换
         item {
             SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                TimePeriod.entries.forEachIndexed { index, period ->
+                ReportType.entries.forEachIndexed { index, type ->
                     SegmentedButton(
-                        selected = state.period == period,
-                        onClick = { viewModel.loadPeriod(period) },
-                        shape = SegmentedButtonDefaults.itemShape(index, TimePeriod.entries.size),
-                    ) { Text(period.label, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                        selected = state.period.type == type,
+                        onClick = { viewModel.switchType(type) },
+                        shape = SegmentedButtonDefaults.itemShape(index, ReportType.entries.size),
+                    ) { Text(type.label, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                }
+            }
+        }
+
+        // 日期导航
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                IconButton(onClick = { viewModel.previousPeriod() }) {
+                    Icon(Icons.AutoMirrored.Filled.NavigateBefore, contentDescription = "上${state.period.type.label.first()}期")
+                }
+                Text(
+                    state.period.label,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                IconButton(onClick = { viewModel.nextPeriod() }) {
+                    Icon(Icons.AutoMirrored.Filled.NavigateNext, contentDescription = "下${state.period.type.label.first()}期")
                 }
             }
         }
@@ -233,9 +257,6 @@ fun BpDataPage(
             }
         }
 
-        item {
-            Text("⚠️ AI 分析仅供参考，不能替代医生诊断。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
 
         // 参考范围
         item {

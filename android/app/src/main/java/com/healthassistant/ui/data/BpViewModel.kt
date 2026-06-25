@@ -5,12 +5,13 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.healthassistant.data.model.BloodPressureRecord
 import com.healthassistant.data.repository.HealthRepository
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import okhttp3.MediaType.Companion.toMediaType
+import kotlinx.coroutines.withContext
 
 data class BpScreenState(
-    val period: TimePeriod = TimePeriod.WEEK,
+    val period: ReportPeriod = ReportPeriod.forType(ReportType.WEEK),
     val records: List<BloodPressureRecord> = emptyList(),
     val avgSystolic: Double = 0.0,
     val avgDiastolic: Double = 0.0,
@@ -31,40 +32,55 @@ class BpViewModel(
     val state: StateFlow<BpScreenState> = _state.asStateFlow()
 
     init {
-        loadPeriod(TimePeriod.WEEK)
+        load()
     }
 
-    fun loadPeriod(period: TimePeriod) {
-        _state.update { it.copy(period = period, isLoading = true) }
+    fun switchType(type: ReportType) {
+        _state.update { it.copy(period = ReportPeriod.forType(type), isLoading = true) }
+        load()
+    }
+
+    fun previousPeriod() {
+        _state.update { it.copy(period = it.period.previous(), isLoading = true) }
+        load()
+    }
+
+    fun nextPeriod() {
+        _state.update { it.copy(period = it.period.next(), isLoading = true) }
+        load()
+    }
+
+    private fun load() {
         viewModelScope.launch {
-            repository.getBpRecentFlow(period.days).collect { records ->
-                val stats = repository.getBpStats(period.days)
+            try {
+                val p = _state.value.period
+                val records = withContext(Dispatchers.IO) {
+                    repository.getBpBetween(p.startIso, p.endIso)
+                }
+                val avgSys = if (records.isNotEmpty()) records.map { it.systolic }.average() else 0.0
+                val avgDia = if (records.isNotEmpty()) records.map { it.diastolic }.average() else 0.0
+                val maxSys = if (records.isNotEmpty()) records.maxOf { it.systolic } else 0
+                val minSys = if (records.isNotEmpty()) records.minOf { it.systolic } else 0
                 _state.update {
                     it.copy(
                         records = records,
-                        avgSystolic = stats.avgSystolic,
-                        avgDiastolic = stats.avgDiastolic,
-                        maxSystolic = stats.maxSystolic,
-                        minSystolic = stats.minSystolic,
-                        totalCount = stats.totalCount,
+                        avgSystolic = avgSys,
+                        avgDiastolic = avgDia,
+                        maxSystolic = maxSys,
+                        minSystolic = minSys,
+                        totalCount = records.size,
                         isLoading = false,
                     )
                 }
+            } catch (e: Exception) {
+                _state.update { it.copy(isLoading = false) }
             }
         }
     }
 
-    fun setAiResult(result: String) {
-        _state.update { it.copy(aiAnalysis = result, isAiLoading = false, aiError = null) }
-    }
-
-    fun setAiError(error: String) {
-        _state.update { it.copy(aiError = error, isAiLoading = false) }
-    }
-
-    fun setAiLoading() {
-        _state.update { it.copy(isAiLoading = true, aiAnalysis = null, aiError = null) }
-    }
+    fun setAiResult(result: String) { _state.update { it.copy(aiAnalysis = result, isAiLoading = false, aiError = null) } }
+    fun setAiError(error: String) { _state.update { it.copy(aiError = error, isAiLoading = false) } }
+    fun setAiLoading() { _state.update { it.copy(isAiLoading = true, aiAnalysis = null, aiError = null) } }
 
     suspend fun analyzeWithAi(
         records: List<BloodPressureRecord>,
@@ -72,15 +88,14 @@ class BpViewModel(
         apiKey: String,
         model: String,
     ): String {
-        require(apiKey.isNotBlank()) { "请先在设置中配置 AI API Key" }
+        require(apiKey.isNotBlank()) { "请先配置 AI API Key" }
         val data = org.json.JSONArray()
         records.sortedByDescending { it.measuredAt }.take(90).forEach { data.put(it.toJson()) }
-
         val prompt = """
 你是一位健康管理助手。请对以下血压数据进行分析，内容包括：
-1. 总体趋势分析（收缩压和舒张压）
-2. 异常值提醒（过高或过低）
-3. 血压分级评估
+1. 总体趋势分析
+2. 收缩压与舒张压的平均水平
+3. 血压控制评估（参考标准 140/90）
 4. 可讨论的健康建议要点
 
 注意事项：
@@ -92,40 +107,7 @@ class BpViewModel(
 
 数据：${data.toString(2)}
         """.trimIndent()
-
-        val body = org.json.JSONObject()
-            .put("model", model)
-            .put("temperature", 0.2)
-            .put("messages", org.json.JSONArray().apply {
-                put(org.json.JSONObject().apply {
-                    put("role", "user")
-                    put("content", prompt)
-                })
-            })
-            .toString()
-
-        val requestBody = "application/json; charset=utf-8".toMediaType().let {
-            okhttp3.RequestBody.create(it, body)
-        }
-        val request = okhttp3.Request.Builder()
-            .url("${apiBaseUrl.trimEnd('/')}/chat/completions")
-            .post(requestBody)
-            .header("Authorization", "Bearer $apiKey")
-            .build()
-
-        val client = okhttp3.OkHttpClient.Builder()
-            .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
-            .readTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
-            .writeTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
-            .build()
-
-        val response = client.newCall(request).execute()
-        require(response.code in 200..299) { "AI 请求失败：HTTP ${response.code}" }
-        val json = org.json.JSONObject(response.body?.string() ?: throw RuntimeException("响应为空"))
-        return json.getJSONArray("choices")
-            .getJSONObject(0)
-            .getJSONObject("message")
-            .getString("content")
+        return com.healthassistant.data.sync.callAiApi(apiBaseUrl, apiKey, model, prompt)
     }
 
     class Factory(private val repository: HealthRepository) : ViewModelProvider.Factory {

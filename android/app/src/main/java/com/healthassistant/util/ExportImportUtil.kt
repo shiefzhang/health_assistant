@@ -39,9 +39,21 @@ object ExportImportUtil {
             .toString(2)
     }
 
-    /** 从 JSON 导入血糖记录 */
+    /** 从 JSON 导入血糖记录（兼容对象、数组、kv-export 三种格式） */
     fun importGlucoseFromJson(text: String): List<GlucoseRecord> {
-        val root = JSONObject(text)
+        val trimmed = text.trim()
+
+        // 纯 JSON 数组格式 [ {...}, ... ]
+        if (trimmed.startsWith("[")) {
+            val array = JSONArray(trimmed)
+            val result = mutableListOf<GlucoseRecord>()
+            for (i in 0 until array.length()) {
+                result.add(GlucoseRecord.fromJson(array.getJSONObject(i)))
+            }
+            return result
+        }
+
+        val root = JSONObject(trimmed)
         val result = mutableListOf<GlucoseRecord>()
 
         // 新版统一格式（v2）
@@ -77,9 +89,11 @@ object ExportImportUtil {
         return result
     }
 
-    /** 从 JSON 导入体重记录 */
+    /** 从 JSON 导入体重记录（兼容对象和数组格式） */
     fun importWeightFromJson(text: String): List<WeightRecord> {
-        val root = JSONObject(text)
+        val trimmed = text.trim()
+        if (trimmed.startsWith("[")) return emptyList() // 纯数组格式不含体重
+        val root = JSONObject(trimmed)
         val result = mutableListOf<WeightRecord>()
         if (root.has("weight")) {
             val array = root.getJSONArray("weight")
@@ -90,9 +104,11 @@ object ExportImportUtil {
         return result
     }
 
-    /** 从 JSON 导入血压记录 */
+    /** 从 JSON 导入血压记录（兼容对象和数组格式） */
     fun importBpFromJson(text: String): List<BloodPressureRecord> {
-        val root = JSONObject(text)
+        val trimmed = text.trim()
+        if (trimmed.startsWith("[")) return emptyList()
+        val root = JSONObject(trimmed)
         val result = mutableListOf<BloodPressureRecord>()
         if (root.has("bloodPressure")) {
             val array = root.getJSONArray("bloodPressure")
@@ -101,5 +117,44 @@ object ExportImportUtil {
             }
         }
         return result
+    }
+
+    /**
+     * 按 type 字段路由导入到对应数据表
+     * @return Triple(glucose, weight, bloodPressure)
+     */
+    fun importByType(text: String): Triple<List<GlucoseRecord>, List<WeightRecord>, List<BloodPressureRecord>> {
+        val trimmed = text.trim()
+        if (!trimmed.startsWith("[")) {
+            // 非数组格式 → 回退到原逻辑
+            return Triple(importGlucoseFromJson(text), importWeightFromJson(text), importBpFromJson(text))
+        }
+
+        val array = JSONArray(trimmed)
+        val glucose = mutableListOf<GlucoseRecord>()
+        val weight = mutableListOf<WeightRecord>()
+        val bp = mutableListOf<BloodPressureRecord>()
+
+        for (i in 0 until array.length()) {
+            val obj = array.getJSONObject(i)
+            val type = obj.optString("type", "")
+
+            when (type) {
+                "blood_glucose" -> glucose.add(GlucoseRecord.fromJson(obj))
+                "weight" -> weight.add(WeightRecord.fromJson(obj))
+                "blood_pressure", "bp" -> bp.add(BloodPressureRecord.fromJson(obj))
+                else -> {
+                    // 无 type 或未知 type → 按字段推断
+                    if (obj.has("systolic") || obj.has("diastolic")) {
+                        bp.add(BloodPressureRecord.fromJson(obj))
+                    } else if (obj.has("heightCm") || obj.has("bodyFatPercent")) {
+                        weight.add(WeightRecord.fromJson(obj))
+                    } else {
+                        glucose.add(GlucoseRecord.fromJson(obj))
+                    }
+                }
+            }
+        }
+        return Triple(glucose, weight, bp)
     }
 }

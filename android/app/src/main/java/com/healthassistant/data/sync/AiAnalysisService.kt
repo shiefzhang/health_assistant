@@ -76,3 +76,40 @@ object AiAnalysisService {
             .getString("content")
     }
 }
+
+/**
+ * 通用 AI API 调用（用于体重、血压等非血糖分析）
+ */
+suspend fun callAiApi(apiBaseUrl: String, apiKey: String, model: String, prompt: String): String {
+    val client = OkHttpClient.Builder()
+        .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+        .readTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
+        .writeTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+        .build()
+
+    val requestBody = JSONObject()
+        .put("model", model)
+        .put("temperature", 0.2)
+        .put("messages", JSONArray().apply {
+            put(JSONObject().apply {
+                put("role", "user")
+                put("content", prompt)
+            })
+        })
+        .toString()
+
+    val request = okhttp3.Request.Builder()
+        .url("${apiBaseUrl.trimEnd('/')}/chat/completions")
+        .post(requestBody.toRequestBody("application/json".toMediaType()))
+        .header("Authorization", "Bearer $apiKey")
+        .build()
+
+    val response = client.newCall(request).execute()
+    require(response.code in 200..299) { "AI 请求失败：HTTP ${response.code}" }
+    val body = response.body?.string() ?: throw RuntimeException("响应为空")
+    val json = JSONObject(body)
+    return json.getJSONArray("choices")
+        .getJSONObject(0)
+        .getJSONObject("message")
+        .getString("content")
+}

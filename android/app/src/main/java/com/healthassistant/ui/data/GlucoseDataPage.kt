@@ -3,7 +3,10 @@ package com.healthassistant.ui.data
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.NavigateBefore
+import androidx.compose.material.icons.automirrored.filled.NavigateNext
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Delete
@@ -117,17 +120,34 @@ fun GlucoseDataPage(
         // 周期切换
         item {
             SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                TimePeriod.entries.forEachIndexed { index, period ->
+                ReportType.entries.forEachIndexed { index, type ->
                     SegmentedButton(
-                        selected = state.period == period,
-                        onClick = { viewModel.loadPeriod(period) },
-                        shape = SegmentedButtonDefaults.itemShape(
-                            index = index,
-                            count = TimePeriod.entries.size,
-                        ),
-                    ) {
-                        Text(period.label, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    }
+                        selected = state.period.type == type,
+                        onClick = { viewModel.switchType(type) },
+                        shape = SegmentedButtonDefaults.itemShape(index, ReportType.entries.size),
+                    ) { Text(type.label, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                }
+            }
+        }
+
+        // 日期导航
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                IconButton(onClick = { viewModel.previousPeriod() }) {
+                    Icon(Icons.AutoMirrored.Filled.NavigateBefore, contentDescription = "上${state.period.type.label.first()}期")
+                }
+                Text(
+                    state.period.label,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                IconButton(onClick = { viewModel.nextPeriod() }) {
+                    Icon(Icons.AutoMirrored.Filled.NavigateNext, contentDescription = "下${state.period.type.label.first()}期")
                 }
             }
         }
@@ -263,15 +283,6 @@ fun GlucoseDataPage(
             }
         }
 
-        // AI 免责声明
-        item {
-            Text(
-                "⚠️ AI 分析仅供参考，不能替代医生诊断。",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-
         // 记录列表标题
         if (state.records.isNotEmpty()) {
             item {
@@ -342,11 +353,13 @@ private fun GlucoseRecordItem(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = record.mealType,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
+                    Text(record.mealType, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                    if (record.type != "blood_glucose") {
+                        Spacer(Modifier.width(4.dp))
+                        Surface(shape = RoundedCornerShape(4.dp), color = MaterialTheme.colorScheme.secondaryContainer) {
+                            Text(record.type, modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSecondaryContainer)
+                        }
+                    }
                     Spacer(Modifier.width(8.dp))
                     Text(
                         text = displayTime,

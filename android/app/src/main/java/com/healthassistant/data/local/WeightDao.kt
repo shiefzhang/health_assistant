@@ -55,4 +55,11 @@ interface WeightDao {
 
     @Query("SELECT COUNT(*) FROM weight_records WHERE deleted = 0 AND measuredAt >= :since")
     suspend fun totalCountSince(since: String): Int
+
+    @Query("""
+        SELECT * FROM weight_records 
+        WHERE deleted = 0 AND measuredAt >= :start AND measuredAt < :end
+        ORDER BY measuredAt ASC
+    """)
+    suspend fun getActiveBetween(start: String, end: String): List<WeightRecord>
 }
