@@ -24,11 +24,7 @@ captures/
 Thumbs.db
 .workbuddy/
 .codebuddy/
-data_arrange/Screenshot_*
-data_arrange/~$*
+# 数据整理目录 — 不推送到远程
+data_arrange/
 # 敏感数据文件 — 包含真实个人健康信息
 kv-export.json
-data_arrange/ant_glucose_import.json
-data_arrange/ant_glucose_data.csv
-data_arrange/ant_glucose_data.xlsx
-data_arrange/health-assistant*.json
