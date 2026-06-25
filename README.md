@@ -132,6 +132,87 @@ cd health_assistant
 }
 ```
 
+## 导入数据格式
+
+支持三种导入格式，导入时按 `type` 字段自动路由到血糖/体重/血压表。
+
+### 1. 类型数组格式（推荐）
+
+带有 `type` 字段的 JSON 数组，按类型自动分流。
+
+```json
+[
+  {
+    "id": "1774656000000",
+    "value": 7.1,
+    "measuredAt": "2026-03-28T08:00:00+08:00",
+    "type": "blood_glucose",
+    "mealType": "空腹",
+    "notes": "导入自蚂蚁阿福",
+    "updatedAt": "2026-03-28T08:00:00Z",
+    "deleted": false
+  },
+  {
+    "id": "1774656000100",
+    "value": 72.5,
+    "measuredAt": "2026-03-28T08:00:00+08:00",
+    "type": "weight",
+    "notes": "",
+    "heightCm": 170,
+    "bodyFatPercent": null,
+    "updatedAt": "2026-03-28T08:00:00Z",
+    "deleted": false
+  },
+  {
+    "id": "1774656000200",
+    "systolic": 125,
+    "diastolic": 85,
+    "heartRate": 72,
+    "measuredAt": "2026-03-28T08:00:00+08:00",
+    "type": "blood_pressure",
+    "notes": "",
+    "updatedAt": "2026-03-28T08:00:00Z",
+    "deleted": false
+  }
+]
+```
+
+`type` 取值与对应数据表：
+
+| type | 导入到 |
+|------|--------|
+| `blood_glucose` | 血糖 |
+| `weight` | 体重 |
+| `blood_pressure` / `bp` | 血压 |
+
+无 `type` 或未知 type 时自动按字段推断（有 `systolic` → 血压，有 `heightCm` → 体重，其余 → 血糖）。
+
+### 2. 旧版 kv-export 格式
+
+```json
+{
+  "record_1770422949263": "{...json字符串...}",
+  "record_1764889110796": "{...json字符串...}"
+}
+```
+
+适用于从旧版应用或第三方工具导出的键值格式。仅导入血糖数据。
+
+### 3. 统一交换格式（导出格式）
+
+```json
+{
+  "format": "health-assistant",
+  "version": 2,
+  "exportedAt": "2026-06-24T10:00:00Z",
+  "glucose": [ ... ],
+  "weight": [ ... ],
+  "bloodPressure": [ ... ]
+}
+```
+
+应用自带的导出/导入格式。支持血糖、体重、血压同时导入导出。
+
 ## License
 
 MIT License
