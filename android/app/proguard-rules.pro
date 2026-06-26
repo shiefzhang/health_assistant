@@ -10,3 +10,9 @@
 
 # Keep EncryptedSharedPreferences
 -keep class androidx.security.crypto.** { *; }
+
+# Suppress R8 warnings for compile-time annotations used by Room
+-dontwarn com.google.errorprone.annotations.CanIgnoreReturnValue
+-dontwarn com.google.errorprone.annotations.CheckReturnValue
+-dontwarn com.google.errorprone.annotations.Immutable
+-dontwarn com.google.errorprone.annotations.RestrictedApi

@@ -48,28 +48,35 @@
 - **架构**: MVVM (ViewModel + StateFlow)
 - **数据库**: Room + KSP
 - **网络**: OkHttp
-- **图表**: 自定义 Canvas 绘制
+- **图表**: 自定义 Canvas 绘制（支持触摸交互）
 - **存储**: EncryptedSharedPreferences
 - **同步**: WebDAV (MKCOL + PUT + GET)
+- **构建**: Gradle (Groovy DSL)
 
 ## 项目结构
 
 ```
-app/src/main/java/com/healthassistant/
-├── data/
-│   ├── local/          # Room 数据库、DAO、迁移
-│   ├── model/          # 数据模型 (GlucoseRecord, BloodPressureRecord, WeightRecord)
-│   ├── repository/     # HealthRepository
-│   └── sync/           # WebDAV 同步、AI 分析
-├── ui/
-│   ├── components/     # 通用组件 (图表、对话框、卡片、MarkdownText)
-│   ├── dashboard/      # 仪表盘
-│   ├── data/           # 各指标数据页 (GlucoseDataPage, BpDataPage, WeightDataPage)
-│   ├── navigation/     # 导航路由
-│   ├── settings/       # 设置页
-│   └── theme/          # 主题、颜色、MaterialYou
-├── util/               # 工具类 (SecurePrefs, ExportImport)
-└── HealthTrackerApp.kt
+HealthAssistant/
+└── android/                    # Android 项目根目录
+    ├── build.gradle              # 根构建文件 (Groovy DSL)
+    ├── settings.gradle
+    └── app/
+        ├── build.gradle
+        └── src/main/java/com/healthassistant/
+            ├── data/
+            │   ├── local/          # Room 数据库、DAO、迁移
+            │   ├── model/          # 数据模型 (GlucoseRecord, BloodPressureRecord, WeightRecord)
+            │   ├── repository/     # HealthRepository
+            │   └── sync/           # WebDAV 同步、AI 分析
+            ├── ui/
+            │   ├── components/     # 通用组件 (图表、对话框、卡片、MarkdownText)
+            │   ├── dashboard/      # 仪表盘
+            │   ├── data/           # 各指标数据页 (GlucoseDataPage, BpDataPage, WeightDataPage)
+            │   ├── navigation/     # 导航路由
+            │   ├── settings/       # 设置页
+            │   └── theme/          # 主题、颜色、MaterialYou
+            ├── util/               # 工具类 (SecurePrefs, ExportImport)
+            └── HealthTrackerApp.kt
 ```
 
 ## 截图
@@ -80,9 +87,11 @@ app/src/main/java/com/healthassistant/
 
 ```bash
 git clone https://github.com/shiefzhang/health_assistant.git
-cd health_assistant
+cd health_assistant/android    # 项目在 android 子目录下
 ./gradlew assembleDebug
 ```
+
+> 项目根目录为 `android/`，进入此目录执行 Gradle 命令。
 
 最低 SDK: 26 (Android 8.0)  
 目标 SDK: 35
